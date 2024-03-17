@@ -1,13 +1,14 @@
 
 #include "mbed.h"
-#include "aes.h"
-#include "stm32l475e_iot01.h"
-#include <stdio.h>
 
+#include <stdio.h>
 #include <string> 
-#include <cstring> 
 #include <array>
 
+#include <cstring>
+#include <cmath> 
+
+#include "stm32l475e_iot01.h"
 #include "stm32l475e_iot01_tsensor.h"
 #include "stm32l475e_iot01_hsensor.h"
 #include "stm32l475e_iot01_accelero.h"
@@ -15,11 +16,29 @@
 
 #define LAST_N_SAMPLES 10
 
-int8_t AccelConfidence(std::array<std::array<int16_t, LAST_N_SAMPLES>, 3> acc, int16_t* current_acc);
-int8_t GyroConfidence(std::array<std::array<int16_t, LAST_N_SAMPLES>, 3> gyro, int16_t* current_gyro);
+template<typename T>  std::array<T, LAST_N_SAMPLES> ppush(std::array<T, LAST_N_SAMPLES> arr, T new_item);
+template<typename T> int mmax(std::array<T, LAST_N_SAMPLES> arr);
+template<typename T> int mmin(std::array<T, LAST_N_SAMPLES> arr);
 
-std::array<int16_t, LAST_N_SAMPLES> acc_push(std::array<int16_t, LAST_N_SAMPLES> st, int16_t ni, int st_s=LAST_N_SAMPLES);
-std::array<float, LAST_N_SAMPLES> gyro_push(std::array<float, LAST_N_SAMPLES> st, int16_t ni, int st_s=LAST_N_SAMPLES);
+std::array<uint8_t, 2> AccelConfidence(
+    std::array<std::array<int16_t, LAST_N_SAMPLES>, 3> old_values,
+    int16_t* current,
+    std::array<int16_t, LAST_N_SAMPLES> samp_rate,
+    std::array<uint8_t, LAST_N_SAMPLES> mov_conf,
+    std::array<uint8_t, LAST_N_SAMPLES> mov_res);
 
-int acc_max(std::array<int16_t, LAST_N_SAMPLES> st);
-int gyro_max(std::array<float, LAST_N_SAMPLES> st);
+std::array<uint8_t, 2> GyroConfidence(
+    std::array<std::array<float, LAST_N_SAMPLES>, 3> old_values,
+    float* current,
+    std::array<int16_t, LAST_N_SAMPLES> samp_rate,
+    std::array<uint8_t, LAST_N_SAMPLES> mov_conf,
+    std::array<uint8_t, LAST_N_SAMPLES> mov_res);
+
+std::array<uint8_t, 2> MovementConfidence(
+    std::array<std::array<int16_t, LAST_N_SAMPLES>, 3> old_acc_values,
+    std::array<std::array<float, LAST_N_SAMPLES>, 3> old_gyro_values,
+    int16_t* current_acc,
+    float* current_gyro,
+    std::array<int16_t, LAST_N_SAMPLES> samp_rate,
+    std::array<uint8_t, LAST_N_SAMPLES> mov_conf,
+    std::array<uint8_t, LAST_N_SAMPLES> mov_res);
