@@ -9,4 +9,4 @@ the current difference of that value. If it is above a specified threshold it me
 
 The development took place in Keil studio using mbed-os version 6.17.0
 
-The serial_comm.m Matlab script works as the IoT hub.
+The serial_comm.m Matlab script works as the IoT hub. The library can be found here (???).

@@ -34,6 +34,7 @@ while (1)
             prev_v = datain(7);
         end
     end
+
     if prev_v == 83
         mov_rec_str = "standing";
     elseif prev_v == 87
@@ -43,40 +44,33 @@ while (1)
     else
         mov_rec_str = "fell"; 
     end
+
     mov_rec_print_str = sprintf('Movement: %s', mov_rec_str);
     disp(mov_rec_print_str);
     if datain(6) == 1  is_in_h_comf_str = "Yes"; else is_in_h_comf_str = "No"; end
     h_comf_print_str = sprintf('Is in human comfort: %s', is_in_h_comf_str);
     disp(h_comf_print_str);
     
-
     if(datain(1) > 0)
         sign = 1;
     else
         sign = -1;
     end
 
-    % append temperature to temps - remember to concatenate the bytes
     temps(count)= sign * (datain(2)*100 + datain(3))/100;
-
-    % append temperature to hums - remember to concatenate the bytes
     hums(count)= (datain(4)*100 + datain(5))/100;
-	
-    % append the current time to times
     times(count) = datetime - start_time;
 
-    % plot temps vs times
     subplot(2, 1, 1);
     plot(times(1:count) , temps(1:count));
     xlabel("Time");
     ylabel("Temperture");
 
-    % plot hums vs times
     subplot(2, 1, 2);
     plot(times(1:count) , hums(1:count));
     xlabel("Time");
     ylabel("Humidity");
     drawnow;
-    % disp()
+
     count = count + 1;
 end
