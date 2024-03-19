@@ -1,4 +1,7 @@
-
+/* mbed Microcontroller Library
+ * Copyright (c) 2019 ARM Limited
+ * SPDX-License-Identifier: Apache-2.0
+ */
 #include "mbed.h"
 
 #include <stdio.h>
@@ -34,7 +37,7 @@ std::array<uint8_t, 2> GyroConfidence(
     std::array<uint8_t, LAST_N_SAMPLES> mov_conf,
     std::array<uint8_t, LAST_N_SAMPLES> mov_res);
 
-std::array<uint8_t, 2> MovementConfidence(
+std::array<uint8_t, 2> MovementRecognition(
     std::array<std::array<int16_t, LAST_N_SAMPLES>, 3> old_acc_values,
     std::array<std::array<float, LAST_N_SAMPLES>, 3> old_gyro_values,
     int16_t* current_acc,

@@ -1,23 +1,21 @@
-/* mbed Microcontroller Library
- * Copyright (c) 2019 ARM Limited
- * SPDX-License-Identifier: Apache-2.0
- */
 #include "main.h"
 #include "aes.h"
 
 using namespace std;
 
-#define BLINKING_RATE     500ms
 #define MAXIMUM_BUFFER_SIZE 16
 
+// Letters S,W,R,F in ASCII
 #define STAND 83
 #define WALK 87
 #define RUN 82
 #define FALL 70
 
+// Sensors thresholds
 #define ACCELEROMETER_RUN_THRESHOLD 600
 #define ACCELEROMETER_WALK_THRESHOLD 550
 #define ACCELEROMETER_STAND_THRESHOLD 100
+#define ACCELEROMETER_FALL_THRESHOLD 1600
 
 #define GYROSCOPE_RUN_THRESHOLD 5500
 #define GYROSCOPE_WALK_THRESHOLD 4100
@@ -27,41 +25,51 @@ using namespace std;
 static DigitalOut led(LED1);
 
 int16_t SAMPLING_RATE_MILLISECONDS = 200;
+int16_t LEAST_SAMPLING_RATE_MILLISECONDS = 200;
 float SAMPLING_RATE_EXP = 2;
 int16_t SAMPLES_ON_THE_SAME_MOVE = 0;
 
 static BufferedSerial serial_port(USBTX, USBRX);
 
 uint8_t is_in_comfort_zone(float x, float y) {
-  if(x < 0 || y < 0) {
-    return 0;
-  }
-  float xy1a[2] = {21.4, 100.0};
-  float xy1b[2] = {25.5, 0};
+    /*
+        Values taken from the CBE Thermal Comfort Tool
+        https://comfort.cbe.berkeley.edu/ (Figure relative humidity vs air temperature)
+    */
+    if(x < 0 || y < 0) {
+        return 0;
+    }
+    // Don't change the numbers below
+    float xy1a[2] = {21.4, 100.0};
+    float xy1b[2] = {25.5, 0};
 
-  float xy2a[2] = {26.2, 100.0};
-  float xy2b[2] = {32, 0};
+    float xy2a[2] = {26.2, 100.0};
+    float xy2b[2] = {32, 0};
 
-  float a1 = (xy1b[1] - xy1a[1]) / (xy1b[0] - xy1a[0]);
-  float a2 = (xy2b[1] - xy2a[1]) / (xy2b[0] - xy2a[0]);
+    float a1 = (xy1b[1] - xy1a[1]) / (xy1b[0] - xy1a[0]);
+    float a2 = (xy2b[1] - xy2a[1]) / (xy2b[0] - xy2a[0]);
 
-  float b1 = xy1a[1] - a1 * xy1a[0];
-  float b2 = xy2a[1] - a2 * xy2a[0];
+    float b1 = xy1a[1] - a1 * xy1a[0];
+    float b2 = xy2a[1] - a2 * xy2a[0];
 
-  float d1 = y - x*a1 - b1;
-  float d2 = y - x*a2 - b2;
-  return (d1 >= 0 && d2 <= 0) ? 1 : 0 ;
+    float d1 = y - x*a1 - b1;
+    float d2 = y - x*a2 - b2;
+    return (d1 >= 0 && d2 <= 0) ? 1 : 0 ;
 } 
 
 void live_change_sampling_rate(float add_exp){
-    // SAMPLING_RATE_MILLISECONDS = 300;
+    /*
+        Changing sampling rate exponentialy 
+        with a lowest value LEAST_SAMPLING_RATE_MILLISECONDS + e^1
+        and max LEAST_SAMPLING_RATE_MILLISECONDS + e^6
+    */
     SAMPLING_RATE_EXP = SAMPLING_RATE_EXP + add_exp;
-    if(SAMPLING_RATE_EXP >= 6){
+    if(SAMPLING_RATE_EXP >= 7){
         SAMPLING_RATE_EXP = 6;
-    }else if(SAMPLING_RATE_EXP <= 1) {
+    } else if(SAMPLING_RATE_EXP <= 1) {
         SAMPLING_RATE_EXP = 1;
-    }else {}
-    SAMPLING_RATE_MILLISECONDS = 100 + exp(SAMPLING_RATE_EXP);
+    } else {}
+    SAMPLING_RATE_MILLISECONDS = LEAST_SAMPLING_RATE_MILLISECONDS + exp(SAMPLING_RATE_EXP);
 }
 
 template<typename T> std::array<T, LAST_N_SAMPLES> ppush(std::array<T, LAST_N_SAMPLES> arr, T new_item){
@@ -111,23 +119,29 @@ std::array<uint8_t, 2> AccelConfidence(
         if(mov_conf[0] == STAND) {moves[0] = STAND; moves[1] = RUN;}
         else if(mov_conf[0] == WALK) { moves[0] = WALK; moves[1] = RUN;}
         else { moves[0] = RUN; moves[1] = RUN;}
+
         live_change_sampling_rate(-0.5);
-    }  else if (abs((_max_z + _min_z) / 2 - current[2]) > 1600) {
+    } else if (abs((_max_z + _min_z) / 2 - current[2]) > ACCELEROMETER_FALL_THRESHOLD) {
         moves[0] = FALL;
         moves[1] = mov_conf[0];
+
         live_change_sampling_rate(-0.9);
-    } else if (abs(current[0] - old_values[0][0]) > ACCELEROMETER_WALK_THRESHOLD ||
-               abs(current[1] - old_values[1][0]) > ACCELEROMETER_WALK_THRESHOLD ||
-               abs(current[2] - old_values[2][0]) > ACCELEROMETER_WALK_THRESHOLD ) {
+    } else if (
+        abs(current[0] - old_values[0][0]) > ACCELEROMETER_WALK_THRESHOLD ||
+        abs(current[1] - old_values[1][0]) > ACCELEROMETER_WALK_THRESHOLD ||
+        abs(current[2] - old_values[2][0]) > ACCELEROMETER_WALK_THRESHOLD ) {
 
         if(mov_conf[0] == WALK) {moves[0] = WALK; moves[1] = WALK;}
         else if(mov_conf[0] == RUN) { moves[0] = RUN; moves[1] = WALK;}
         else if(mov_conf[0] == STAND) { moves[0] = STAND; moves[1] = WALK;}
         else { mov_conf[0] = WALK; moves[1] = WALK;}
+
         live_change_sampling_rate(-0.4);
-    } else if (abs(current[0] - old_values[0][0]) > ACCELEROMETER_STAND_THRESHOLD ||
-               abs(current[1] - old_values[1][0]) > ACCELEROMETER_STAND_THRESHOLD ||
-               abs(current[2] - old_values[2][0]) > ACCELEROMETER_STAND_THRESHOLD) {
+    } else if (
+        abs(current[0] - old_values[0][0]) > ACCELEROMETER_STAND_THRESHOLD ||
+        abs(current[1] - old_values[1][0]) > ACCELEROMETER_STAND_THRESHOLD ||
+        abs(current[2] - old_values[2][0]) > ACCELEROMETER_STAND_THRESHOLD) {
+
         if(mov_conf[0] == WALK) {moves[0] = WALK; moves[1] = WALK;}
         else if(mov_conf[0] == RUN) { moves[0] = RUN; moves[1] = WALK;}
         else if(mov_conf[0] == STAND) { moves[0] = STAND; moves[1] = WALK;}
@@ -135,6 +149,7 @@ std::array<uint8_t, 2> AccelConfidence(
         
         live_change_sampling_rate(0.3);
     } else {
+
         if(mov_conf[0] == STAND) {moves[0] = STAND; moves[1] = STAND;}
         else if(mov_conf[0] == RUN) { moves[0] = RUN; moves[1] = STAND;}
         else if(mov_conf[0] == WALK) { moves[0] = WALK; moves[1] = STAND;}
@@ -161,33 +176,44 @@ std::array<uint8_t, 2> GyroConfidence(
     if(abs(current[0] - old_values[0][0]) > GYROSCOPE_RUN_THRESHOLD ||
        abs(current[1] - old_values[1][0]) > GYROSCOPE_RUN_THRESHOLD ||
        abs(current[2] - old_values[2][0]) > GYROSCOPE_RUN_THRESHOLD) {
+    
         if(mov_conf[0] == STAND) {moves[0] = STAND; moves[1] = RUN;}
         else if(mov_conf[0] == WALK) { moves[0] = WALK; moves[1] = RUN;}
         else { moves[0] = RUN; moves[1] = RUN;}
+
         live_change_sampling_rate(-0.5);
-    }  else if (abs(_max_y + _min_y / 2.0 - current[1]) > 2500 && abs(_max_x + _min_x / 2.0 - current[0]) > 2500 && abs(_max_z + _min_z / 2.0 - current[2]) > 2500) {
+    } else if (
+        abs(_max_y + _min_y / 2.0 - current[1]) > GYROSCOPE_FALL_THRESHOLD ||
+        abs(_max_x + _min_x / 2.0 - current[0]) > GYROSCOPE_FALL_THRESHOLD ||
+        abs(_max_z + _min_z / 2.0 - current[2]) > GYROSCOPE_FALL_THRESHOLD) {
+
         moves[0] = FALL;
         moves[1] = mov_conf[0];
+
         live_change_sampling_rate(-0.9);
-    } else if (abs(current[0] - old_values[0][0]) > GYROSCOPE_WALK_THRESHOLD ||
-               abs(current[1] - old_values[1][0]) > GYROSCOPE_WALK_THRESHOLD ||
-               abs(current[2] - old_values[2][0]) > GYROSCOPE_WALK_THRESHOLD ) {
+    } else if (
+        abs(current[0] - old_values[0][0]) > GYROSCOPE_WALK_THRESHOLD ||
+        abs(current[1] - old_values[1][0]) > GYROSCOPE_WALK_THRESHOLD ||
+        abs(current[2] - old_values[2][0]) > GYROSCOPE_WALK_THRESHOLD ) {
 
         if(mov_conf[0] == WALK) {moves[0] = WALK; moves[1] = WALK;}
         else if(mov_conf[0] == RUN) { moves[0] = RUN; moves[1] = WALK;}
         else if(mov_conf[0] == STAND) { moves[0] = STAND; moves[1] = WALK;}
         else { moves[0] = WALK; moves[1] = WALK;}
+
         live_change_sampling_rate(-0.4);
-    } else if (abs(current[0] - old_values[0][0]) > GYROSCOPE_WALK_THRESHOLD ||
-               abs(current[1] - old_values[1][0]) > GYROSCOPE_WALK_THRESHOLD ||
-               abs(current[2] - old_values[2][0]) > GYROSCOPE_WALK_THRESHOLD) {
+    } else if (
+        abs(current[0] - old_values[0][0]) > GYROSCOPE_WALK_THRESHOLD ||
+        abs(current[1] - old_values[1][0]) > GYROSCOPE_WALK_THRESHOLD ||
+        abs(current[2] - old_values[2][0]) > GYROSCOPE_WALK_THRESHOLD) {
+
         if(mov_conf[0] == WALK) {moves[0] = WALK; moves[1] = WALK;}
         else if(mov_conf[0] == RUN) { moves[0] = RUN; moves[1] = WALK;}
         else if(mov_conf[0] == STAND) { moves[0] = STAND; moves[1] = WALK;}
         else { moves[0] = WALK; moves[1] = WALK;}
         
         live_change_sampling_rate(0.3);
-    }else {
+    } else {
         if(mov_conf[0] == STAND) {moves[0] = STAND; moves[1] = STAND;}
         else if(mov_conf[0] == RUN) { moves[0] = RUN; moves[1] = STAND;}
         else if(mov_conf[0] == WALK) { moves[0] = WALK; moves[1] = STAND;}
@@ -199,7 +225,7 @@ std::array<uint8_t, 2> GyroConfidence(
     return moves;
 }
 
-std::array<uint8_t, 2> MovementConfidence(
+std::array<uint8_t, 2> MovementRecognition(
     std::array<std::array<int16_t, LAST_N_SAMPLES>, 3> old_acc_values,
     std::array<std::array<float, LAST_N_SAMPLES>, 3> old_gyro_values,
     int16_t* current_acc,
@@ -212,16 +238,11 @@ std::array<uint8_t, 2> MovementConfidence(
     std::array<uint8_t, 2> gmove = GyroConfidence(old_gyro_values, current_gyro, samp_rate, mov_conf, mov_res);
     std::array<uint8_t, 2> fmove;
 
-    if (amove[0] == gmove[0]){
-        fmove[0] = amove[0];}
-    else if(amove[0] == FALL || gmove[0] == FALL){
-        fmove[0] = FALL;}
-    else if(amove[0] != gmove[0]){
-        fmove[0] = amove[0];}
-    else if(amove[0] == STAND){
-        fmove[0] = STAND;}
-    else{
-        fmove[0] = STAND;}
+    if (amove[0] == gmove[0])                       {fmove[0] = amove[0];}
+    else if(amove[0] == FALL || gmove[0] == FALL)   {fmove[0] = FALL;}
+    else if(amove[0] != gmove[0])                   {fmove[0] = amove[0];}
+    else if(amove[0] == STAND)                      {fmove[0] = STAND;}
+    else                                            {fmove[0] = STAND;}
 
     return fmove;
 }
@@ -231,16 +252,15 @@ int main()
     HAL_Init();
     BSP_GYRO_Init();
     BSP_ACCELERO_Init();
+    
+    std::array<std::array<int16_t, LAST_N_SAMPLES>, 3> last_acc_samples; // Last LAST_N_SAMPLES samples of accelerometer
+    std::array<std::array<float, LAST_N_SAMPLES>, 3> last_gyro_samples; // Last LAST_N_SAMPLES samples of gyroscope
+    std::array<uint8_t, LAST_N_SAMPLES> last_movement_results; // Last LAST_N_SAMPLES movement results
+    std::array<uint8_t, LAST_N_SAMPLES> last_movement_confidence; // Last LAST_N_SAMPLES samples of gyroscope
+    std::array<int16_t, LAST_N_SAMPLES> last_sampling_rates; // Last LAST_N_SAMPLES samples of gyroscope
 
-    std::array<std::array<int16_t, LAST_N_SAMPLES>, 3> last_acc_samples;
-    std::array<std::array<float, LAST_N_SAMPLES>, 3> last_gyro_samples;
-    std::array<uint8_t, LAST_N_SAMPLES> last_movement_results;
-    std::array<uint8_t, LAST_N_SAMPLES> last_movement_confidence;
-    std::array<int16_t, LAST_N_SAMPLES> last_sampling_rates;
-
+    // Initializing the last movement conidence with a random possible state
     last_movement_confidence[0] = STAND;
-    // DigitalOut led(LED1);
-    // DigitalOut led_comfort(LED2);
 
     serial_port.set_baud(9600);
     serial_port.set_format(
@@ -251,25 +271,28 @@ int main()
     uint8_t buf[MAXIMUM_BUFFER_SIZE] = {0};
     uint8_t trigger[MAXIMUM_BUFFER_SIZE] = {0};
 
+    // The cryptographic key
     uint8_t key[] = {0x5c, 0x7e, 0x15, 0x16, 0x28, 0xae, 0xd2, 0xa6, 0xab, 0xf7, 0x15, 0x88, 0x09, 0xcf, 0x4f, 0x3c};
 
     int8_t _started = 0;
 
+    // The accelerometer and gyroscope current values
     float gyro_value[3];
     int16_t accel_value[3];
 
     uint32_t _start = serial_port.read(trigger, sizeof(trigger));
+
     std::array<uint8_t, 2>  move;
+
     float sensor_t_value = 0;
     float sensor_h_value = 0;
-    uint8_t tmpInt1;
-    uint8_t tmpInt2;
 
-    uint8_t humInt1;
-    uint8_t humInt2;
+    uint8_t temp_integer_part;
+    uint8_t temp_decimal_part;
 
-    
-    
+    uint8_t hum_integer_part;
+    uint8_t hum_decimal_part;
+
     while (1) {
         
         BSP_ACCELERO_AccGetXYZ(accel_value);
@@ -277,18 +300,18 @@ int main()
         sensor_t_value = BSP_TSENSOR_ReadTemp();
         sensor_h_value = BSP_HSENSOR_ReadHumidity();
 
-        tmpInt1 = (int) sensor_t_value;
-        tmpInt2 = (int)(sensor_t_value * 100) - tmpInt1*100;
+        temp_integer_part = (int) sensor_t_value;
+        temp_decimal_part = (int)(sensor_t_value * 100) - temp_integer_part*100;
 
         buf[0] = sensor_t_value > 0 ? 1 : 0;
-        buf[1] = tmpInt1;
-        buf[2] = tmpInt2;
+        buf[1] = temp_integer_part;
+        buf[2] = temp_decimal_part;
 
-        humInt1 = (int) sensor_h_value;
-        humInt2 = (int)(sensor_h_value * 100) - humInt1*100;
+        hum_integer_part = (int) sensor_h_value;
+        hum_decimal_part = (int)(sensor_h_value * 100) - hum_integer_part*100;
 
-        buf[3] = humInt1;
-        buf[4] = humInt2;
+        buf[3] = hum_integer_part;
+        buf[4] = hum_decimal_part;
 
         buf[5] = is_in_comfort_zone(sensor_t_value , sensor_h_value);
 
@@ -305,7 +328,8 @@ int main()
             continue;
         }
 
-        move = MovementConfidence(
+        // Movement recognition confidence
+        move = MovementRecognition(
             last_acc_samples, 
             last_gyro_samples, 
             accel_value, 
@@ -316,12 +340,16 @@ int main()
         
         buf[6] = move[0];
 
+        // Keeping how many times the recognized movement 
+        // has been stayed the same
         if(move[0] == last_movement_results[0]) {
             SAMPLES_ON_THE_SAME_MOVE += 1;
         } else {
             SAMPLES_ON_THE_SAME_MOVE = 0;
         }
 
+        // Depending on how many samples the recognized movement
+        // has been rmained the same, we increase the sampling rate
         if(SAMPLES_ON_THE_SAME_MOVE >= 6){
             live_change_sampling_rate(0.7);
         } else if(SAMPLES_ON_THE_SAME_MOVE >= 4){
@@ -332,10 +360,12 @@ int main()
             live_change_sampling_rate(0.1);
         }
 
+        // Updating the accelerometer last n values
         last_acc_samples[0] = ppush(last_acc_samples[0], accel_value[0]);
         last_acc_samples[1] = ppush(last_acc_samples[1], accel_value[1]);
         last_acc_samples[2] = ppush(last_acc_samples[2], accel_value[2]);
 
+        // Updating the gyroscope last n values
         last_gyro_samples[0] = ppush(last_gyro_samples[0], gyro_value[0]);
         last_gyro_samples[1] = ppush(last_gyro_samples[1], gyro_value[1]);
         last_gyro_samples[2] = ppush(last_gyro_samples[2], gyro_value[2]);

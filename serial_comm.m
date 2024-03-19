@@ -26,15 +26,29 @@ while (1)
     ciphertext = fread(comm_conn,16,'uint8');
     
     datain = inv_cipher (ciphertext, w, inv_s_box, inv_poly_mat);
+    clc;
     if count ==1
         prev_v = char(datain(7));
     else
         if char(datain(7)) ~= prev_v
-            prev_v = char(datain(7));
-            clc;
-            disp(prev_v);
+            prev_v = datain(7);
         end
     end
+    if prev_v == 83
+        mov_rec_str = "standing";
+    elseif prev_v == 87
+        mov_rec_str = "walking"; 
+    elseif prev_v == 82
+        mov_rec_str = "running"; 
+    else
+        mov_rec_str = "fell"; 
+    end
+    mov_rec_print_str = sprintf('Movement: %s', mov_rec_str);
+    disp(mov_rec_print_str);
+    if datain(6) == 1  is_in_h_comf_str = "Yes"; else is_in_h_comf_str = "No"; end
+    h_comf_print_str = sprintf('Is in human comfort: %s', is_in_h_comf_str);
+    disp(h_comf_print_str);
+    
 
     if(datain(1) > 0)
         sign = 1;
