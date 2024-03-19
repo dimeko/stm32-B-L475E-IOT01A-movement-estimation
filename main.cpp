@@ -14,12 +14,12 @@ using namespace std;
 // Sensors thresholds
 #define ACCELEROMETER_RUN_THRESHOLD 600
 #define ACCELEROMETER_WALK_THRESHOLD 550
-#define ACCELEROMETER_STAND_THRESHOLD 100
+#define ACCELEROMETER_SLOW_WALK_THRESHOLD 100
 #define ACCELEROMETER_FALL_THRESHOLD 1600
 
 #define GYROSCOPE_RUN_THRESHOLD 5500
 #define GYROSCOPE_WALK_THRESHOLD 4100
-#define GYROSCOPE_STAND_THRESHOLD 3050
+#define GYROSCOPE_SLOW_WALK_THRESHOLD 3050
 #define GYROSCOPE_FALL_THRESHOLD 2700
 
 static DigitalOut led(LED1);
@@ -121,7 +121,7 @@ std::array<uint8_t, 2> AccelConfidence(
         else { moves[0] = RUN; moves[1] = RUN;}
 
         live_change_sampling_rate(-0.5);
-    } else if (abs((_max_z + _min_z) / 2 - current[2]) > ACCELEROMETER_FALL_THRESHOLD) {
+    } else if (abs(_max_z - _min_z) > ACCELEROMETER_WALK_THRESHOLD && abs((_max_z + _min_z) / 2 - current[2]) > ACCELEROMETER_FALL_THRESHOLD) {
         moves[0] = FALL;
         moves[1] = mov_conf[0];
 
@@ -138,9 +138,9 @@ std::array<uint8_t, 2> AccelConfidence(
 
         live_change_sampling_rate(-0.4);
     } else if (
-        abs(current[0] - old_values[0][0]) > ACCELEROMETER_STAND_THRESHOLD ||
-        abs(current[1] - old_values[1][0]) > ACCELEROMETER_STAND_THRESHOLD ||
-        abs(current[2] - old_values[2][0]) > ACCELEROMETER_STAND_THRESHOLD) {
+        abs(current[0] - old_values[0][0]) > ACCELEROMETER_SLOW_WALK_THRESHOLD ||
+        abs(current[1] - old_values[1][0]) > ACCELEROMETER_SLOW_WALK_THRESHOLD ||
+        abs(current[2] - old_values[2][0]) > ACCELEROMETER_SLOW_WALK_THRESHOLD) {
 
         if(mov_conf[0] == WALK) {moves[0] = WALK; moves[1] = WALK;}
         else if(mov_conf[0] == RUN) { moves[0] = RUN; moves[1] = WALK;}
@@ -203,9 +203,9 @@ std::array<uint8_t, 2> GyroConfidence(
 
         live_change_sampling_rate(-0.4);
     } else if (
-        abs(current[0] - old_values[0][0]) > GYROSCOPE_WALK_THRESHOLD ||
-        abs(current[1] - old_values[1][0]) > GYROSCOPE_WALK_THRESHOLD ||
-        abs(current[2] - old_values[2][0]) > GYROSCOPE_WALK_THRESHOLD) {
+        abs(current[0] - old_values[0][0]) > GYROSCOPE_SLOW_WALK_THRESHOLD ||
+        abs(current[1] - old_values[1][0]) > GYROSCOPE_SLOW_WALK_THRESHOLD ||
+        abs(current[2] - old_values[2][0]) > GYROSCOPE_SLOW_WALK_THRESHOLD) {
 
         if(mov_conf[0] == WALK) {moves[0] = WALK; moves[1] = WALK;}
         else if(mov_conf[0] == RUN) { moves[0] = RUN; moves[1] = WALK;}
@@ -249,10 +249,12 @@ std::array<uint8_t, 2> MovementRecognition(
 
 int main()
 {
-    HAL_Init();
+    // Sensor initialization
     BSP_GYRO_Init();
     BSP_ACCELERO_Init();
-    
+    BSP_TSENSOR_Init();
+    BSP_HSENSOR_Init();
+
     std::array<std::array<int16_t, LAST_N_SAMPLES>, 3> last_acc_samples; // Last LAST_N_SAMPLES samples of accelerometer
     std::array<std::array<float, LAST_N_SAMPLES>, 3> last_gyro_samples; // Last LAST_N_SAMPLES samples of gyroscope
     std::array<uint8_t, LAST_N_SAMPLES> last_movement_results; // Last LAST_N_SAMPLES movement results
