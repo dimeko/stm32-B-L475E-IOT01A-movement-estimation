@@ -26,8 +26,6 @@ int main()
     char buf[MAXIMUM_BUFFER_SIZE] = {0};
     uint8_t trigger[MAXIMUM_BUFFER_SIZE] = {0};
 
-    uint8_t key[] = {0x5c, 0x7e, 0x15, 0x16, 0x28, 0xae, 0xd2, 0xa6, 0xab, 0xf7, 0x15, 0x88, 0x09, 0xcf, 0x4f, 0x3c};
-
     std:string resultant;
     float gyro_value[3];
     int16_t accel_value[3];
@@ -74,11 +72,9 @@ int main()
             serial_port.write(buf, sizeof(buf));
         }
 
-        
         BSP_GYRO_GetXYZ(gyro_value);
         resultant=to_string(gyro_value[0]);
 
-        // Smaller buffer for string
         buf[0] = resultant.c_str()[0];
         buf[1] = resultant.c_str()[1];
         buf[2] = resultant.c_str()[2];
