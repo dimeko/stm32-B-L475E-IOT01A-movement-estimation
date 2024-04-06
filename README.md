@@ -1,8 +1,8 @@
-### Simple movement recognition for wearable STM32 B-L475VG-IOT01A
+### Movement recognition STM32L4 B-L475E-IOT01A
 
-A small program that recognizes the four movement/gestures standing, walking, running and falling and sends the results to a hub (Matlab).
+A POC program that recognizes (not in the most efficient) the four movement/gestures standing, walking, running and falling and sends the results to a hub (Matlab).
 Along with the gesture recognition, the microcontroller, captures the current humidity and temperature and sends them to the hub along with the a boolean value that says if the environment is inside the human comfort zone, specified on this (article from Berkeley, Tartarini, F., Schiavon, S., Cheung, T., Hoyt, T.)[https://comfort.cbe.berkeley.edu/]
-The microcontroller is the STM32 B-L475VG-IOT01A with the mbed-os 6.17.0 firmware.
+The microcontroller is the STM32L4 B-L475E-IOT01A with the mbed-os 6.17.0 firmware.
 
 #### Movement recognition logic
 
