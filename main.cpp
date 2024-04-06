@@ -15,7 +15,7 @@ using namespace std;
 #define ACCELEROMETER_RUN_THRESHOLD 600
 #define ACCELEROMETER_WALK_THRESHOLD 550
 #define ACCELEROMETER_SLOW_WALK_THRESHOLD 100
-#define ACCELEROMETER_FALL_THRESHOLD 1600
+#define ACCELEROMETER_FALL_THRESHOLD 600
 
 #define GYROSCOPE_RUN_THRESHOLD 5500
 #define GYROSCOPE_WALK_THRESHOLD 4100
@@ -113,7 +113,9 @@ std::array<uint8_t, 2> AccelConfidence(
     int16_t _min_x = mmin(old_values[0]); int16_t _min_y = mmin(old_values[1]); int16_t _min_z = mmin(old_values[2]);
 
     std::array<uint8_t, 2>  moves;
-    if(abs(current[0] - old_values[0][0]) > ACCELEROMETER_RUN_THRESHOLD ||
+
+    
+     if(abs(current[0] - old_values[0][0]) > ACCELEROMETER_RUN_THRESHOLD ||
        abs(current[1] - old_values[1][0]) > ACCELEROMETER_RUN_THRESHOLD ||
        abs(current[2] - old_values[2][0]) > ACCELEROMETER_RUN_THRESHOLD) {
         if(mov_conf[0] == STAND) {moves[0] = STAND; moves[1] = RUN;}
@@ -121,12 +123,13 @@ std::array<uint8_t, 2> AccelConfidence(
         else { moves[0] = RUN; moves[1] = RUN;}
 
         live_change_sampling_rate(-0.5);
-    } else if (abs(_max_z - _min_z) > ACCELEROMETER_WALK_THRESHOLD && abs((_max_z + _min_z) / 2 - current[2]) > ACCELEROMETER_FALL_THRESHOLD) {
+    } else if (abs(_max_z - _min_z) > ACCELEROMETER_FALL_THRESHOLD && abs((_max_z + _min_z) / 2 - current[2]) > ACCELEROMETER_FALL_THRESHOLD) {
         moves[0] = FALL;
         moves[1] = mov_conf[0];
 
         live_change_sampling_rate(-0.9);
-    } else if (
+    }
+     else if (
         abs(current[0] - old_values[0][0]) > ACCELEROMETER_WALK_THRESHOLD ||
         abs(current[1] - old_values[1][0]) > ACCELEROMETER_WALK_THRESHOLD ||
         abs(current[2] - old_values[2][0]) > ACCELEROMETER_WALK_THRESHOLD ) {
@@ -156,6 +159,11 @@ std::array<uint8_t, 2> AccelConfidence(
         else { moves[0] = STAND; moves[1] = STAND;}
         
         live_change_sampling_rate(0.5);
+    }
+
+
+    if(mov_res[0] == FALL && moves[0] == STAND){
+        moves[0] = FALL;
     }
 
     return moves;
@@ -220,6 +228,10 @@ std::array<uint8_t, 2> GyroConfidence(
         else { moves[0] = STAND; moves[1] = STAND;}
         
         live_change_sampling_rate(0.5);
+    }
+
+    if(mov_res[0] == FALL && moves[0] == STAND){
+        moves[0] = FALL;
     }
 
     return moves;
