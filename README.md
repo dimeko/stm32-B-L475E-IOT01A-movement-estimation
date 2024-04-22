@@ -1,15 +1,15 @@
-### Movement recognition STM32L4 B-L475E-IOT01A
+### Movement estimation STM32L4 B-L475E-IOT01A
 
-A POC program that recognizes (not in the most efficient) the four movement/gestures standing, walking, running and falling and sends the results to a hub (Matlab).
-Along with the gesture recognition, the microcontroller, captures the current humidity and temperature and sends them to the hub along with the a boolean value that says if the environment is inside the human comfort zone, specified on this (article from Berkeley, Tartarini, F., Schiavon, S., Cheung, T., Hoyt, T.)[https://comfort.cbe.berkeley.edu/]
+A POC program that estimates (not in the most efficient way) the four movement/gestures standing, walking, running and falling and sends the results to a hub (Matlab).
+Along with the gesture estimation, the microcontroller, captures the current humidity and temperature and sends them to the hub along with the a boolean value that says if the environment is inside the human comfort zone, specified on this (article from Berkeley, Tartarini, F., Schiavon, S., Cheung, T., Hoyt, T.)[https://comfort.cbe.berkeley.edu/]
 The microcontroller is the STM32L4 B-L475E-IOT01A with the mbed-os 6.17.0 firmware.
 
-#### Movement recognition logic
+#### Movement estimation logic
 
-The accelerometer and gyroscope, read the values in arrays of length 3 [x, y, z] and we store them in two separate 3-length arrays. The movement types that the program can recognize are standing, walking, running and falling. The user movement is considered as periodic and back-and-forth. So we just check the scale of the change in the accelerator and gyroscopre values.
+The accelerometer and gyroscope, read the values in arrays of length 3 [x, y, z] and we store them in two separate 3-length arrays. The movement types that the program can estimate are standing, walking, running and falling. The user movement is considered as periodic and back-and-forth. So we just check the scale of the change in the accelerator and gyroscopre values.
 For example, if the difference between the current accelerometer Z axis and previous one is above 600, then the result is "run".
 
-In addition, we store the last 10 samples in two 2d matrices `[[x1,y1,z1], [x2,y2,z2],...,[x10,y10,z10]]`, one for each movement sensor, the last 10 recognition results and the last 10 result confidence.
+In addition, we store the last 10 samples in two 2d matrices `[[x1,y1,z1], [x2,y2,z2],...,[x10,y10,z10]]`, one for each movement sensor, the last 10 estimations results and the last 10 result confidence.
 
 #### Sampling rate change
 
